@@ -25,6 +25,7 @@ public class Tokenizer implements Serializable {
 	 * @param delimiters the delimiters of the tokenizer, usually, the operators symbols, the brackets and the function argument separator are used as delimiter in the string.
 	 */
 	public Tokenizer(List<String> delimiters) {
+		//System.out.println("Tokenizer: delimiters are: " + delimiters.toString());
 		if (onlyOneChar(delimiters)) {
 			StringBuilder builder = new StringBuilder();
 			for (String delimiter : delimiters) {
@@ -34,6 +35,7 @@ public class Tokenizer implements Serializable {
 		} else {
 			this.pattern = delimitersToRegexp(delimiters);
 		}
+		//System.out.println("Tokenizer: pattern is: " + this.pattern.toString());
 		trimTokens = true;
 	}
 	
@@ -78,7 +80,7 @@ public class Tokenizer implements Serializable {
 		});
 		// Build a string that will contain the regular expression
 		StringBuilder result = new StringBuilder();
-		result.append('(');
+		result.append("(\'.*?\'");
 		for (String delim : delimiters) {
 			// For each delimiter
 			if (result.length()!=1) {

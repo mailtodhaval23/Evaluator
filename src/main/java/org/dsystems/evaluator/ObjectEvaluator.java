@@ -2,8 +2,11 @@ package org.dsystems.evaluator;
 
 import java.io.Serializable;
 import java.text.NumberFormat;
+import java.text.ParseException;
 import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Locale;
 
@@ -71,6 +74,10 @@ public class ObjectEvaluator extends AbstractEvaluator<Object> implements Serial
 	public static final Constant PI = new Constant("pi");
 	/** A constant that represents e (2.718281...) */
 	public static final Constant E = new Constant("e");
+	/** A constant that represents NULL (null) */
+	public static final Constant NULL = new Constant("null");
+	/** A constant that represents TODAY (today) */
+	public static final Constant TODAY = new Constant("today");
 	
 	/** Returns the smallest integer >= argument */
 	public static final Function CEIL = new Function("ceil", 1);
@@ -117,7 +124,20 @@ public class ObjectEvaluator extends AbstractEvaluator<Object> implements Serial
 	
 	/** Returns a pseudo random number */
 	public static final Function RANDOM = new Function("random", 0);
-
+	
+	/** Returns ARG2 if ARG1 is TRUE else ARG3 */
+	public static final Function IF = new Function("if", 3);
+	
+	/** Compares ARG1-date1 and ARG2-date2 and 
+	 * returns "equal" if dates are equal
+	 * returns "before" if date1 is before date2 i.e. date1 < date2
+	 * returns "after" if date1 is after date2 i.e. date1 > date2 
+	 * ARG3 is date format for date1 and ARG4 is date format for date2
+	 *  */
+	public static final Function DATECOMAPRE = new Function("datecompare", 4);
+	
+	/** Returns whether argument string is empty of not */
+	public static final Function ISEMPTY = new Function("isempty", 1);
 	/** The negate unary operator in the Excel like operator precedence.*/
 	public static final Operator NEGATE_HIGH = new Operator("-", 1, Operator.Associativity.RIGHT, 9);
 	/** The exponentiation operator.*/
@@ -157,9 +177,9 @@ public class ObjectEvaluator extends AbstractEvaluator<Object> implements Serial
 	/** The excel like whole set of predefined operators */
 	private static final Operator[] OPERATORS_EXCEL = new Operator[]{NEGATE_HIGH, MINUS, PLUS, MULTIPLY, DIVIDE, EXPONENT, MODULO};
 	/** The whole set of predefined functions */
-	private static final Function[] FUNCTIONS = new Function[]{SINE, COSINE, TANGENT, ASINE, ACOSINE, ATAN, SINEH, COSINEH, TANGENTH, MIN, MAX, SUM, AVERAGE, LN, LOG, ROUND, CEIL, FLOOR, ABS, RANDOM};
+	private static final Function[] FUNCTIONS = new Function[]{SINE, COSINE, TANGENT, ASINE, ACOSINE, ATAN, SINEH, COSINEH, TANGENTH, MIN, MAX, SUM, AVERAGE, LN, LOG, ROUND, CEIL, FLOOR, ABS, RANDOM, IF, DATECOMAPRE, ISEMPTY};
 	/** The whole set of predefined constants */
-	private static final Constant[] CONSTANTS = new Constant[]{PI, E};
+	private static final Constant[] CONSTANTS = new Constant[]{PI, E, NULL, TODAY};
 	
 	private static Parameters DEFAULT_PARAMETERS;
 	private static final NumberFormat FORMATTER = NumberFormat.getNumberInstance(Locale.US);
@@ -236,6 +256,11 @@ public class ObjectEvaluator extends AbstractEvaluator<Object> implements Serial
 			return Math.PI;
 		} else if (E.equals(constant)) {
 			return Math.E;
+		} else if (NULL.equals(constant)) {
+			return null;
+		} else if (TODAY.equals(constant)) {
+			SimpleDateFormat sdf = new SimpleDateFormat("MM-dd-yyyy");
+			return sdf.format(new Date()); 
 		} else {
 			return super.evaluate(constant, evaluationContext);
 		}
@@ -322,7 +347,7 @@ public class ObjectEvaluator extends AbstractEvaluator<Object> implements Serial
 	 */
 	@Override
 	protected Object evaluate(Function function, Iterator<Object> arguments, Object evaluationContext) {
-		Double result;
+		Object result;
 		if (ABS.equals(function)) {
 			result = Math.abs((Double) arguments.next());
 		} else if (CEIL.equals(function)) {
@@ -357,40 +382,88 @@ public class ObjectEvaluator extends AbstractEvaluator<Object> implements Serial
 		} else if (MIN.equals(function)) {
 			result = (Double)arguments.next();
 			while (arguments.hasNext()) {
-				result = Math.min(result, (Double)arguments.next());
+				result = Math.min((Double) result, (Double)arguments.next());
 			}
 		} else if (MAX.equals(function)) {
 			result = (Double)arguments.next();
 			while (arguments.hasNext()) {
-				result = Math.max(result, (Double)arguments.next());
+				result = Math.max((Double) result, (Double)arguments.next());
 			}
 		} else if (SUM.equals(function)) {
 			result = 0.;
 			while (arguments.hasNext()) {
-				result = result + (Double)arguments.next();
+				result = (Double)result + (Double)arguments.next();
 			}
 		} else if (AVERAGE.equals(function)) {
 			result = 0.;
 			int nb = 0;
 			while (arguments.hasNext()) {
-				result = result + (Double)arguments.next();
+				result = (Double)result + (Double)arguments.next();
 				nb++;
 			}
-			result = result/nb;
+			result = (Double)result/nb;
 		} else if (LN.equals(function)) {
 			result = Math.log((Double)arguments.next());
 		} else if (LOG.equals(function)) {
 			result = Math.log10((Double)arguments.next());
 		} else if (RANDOM.equals(function)) {
 			result = Math.random();
-		} else {
+		} else if (IF.equals(function)) {
+			String arg1 = arguments.next().toString();
+			//System.out.println("IF: Argument1: " + arg1);
+			if (Boolean.parseBoolean(arg1)) {
+				result = arguments.next();
+				arguments.next();
+			} else {
+				arguments.next();
+				result = arguments.next();
+			}
+			
+		} else if (DATECOMAPRE.equals(function)) {
+			result = "equal";
+			String date1str = arguments.next().toString().replaceAll("'", "");
+			String date2str = arguments.next().toString().replaceAll("'", "");
+			String date1format = arguments.next().toString().replaceAll("'", "");
+			String date2format = arguments.next().toString().replaceAll("'", "");
+			SimpleDateFormat sdf1 = new SimpleDateFormat(date1format);
+			SimpleDateFormat sdf2 = new SimpleDateFormat(date2format);
+			//System.out.println("date1: " + date1str + " date2: " + date2str + "format1: " + date1format + "format2: " + date2format );
+        	
+        	try {
+        		Date date1 = sdf1.parse(date1str);
+				Date date2 = sdf2.parse(date2str);
+				//System.out.println("date1: " + date1 + " date2: " + date2);
+				if(date1.after(date2)){
+					result = "after";
+	        	}
+	        	
+	        	if(date1.before(date2)){
+	        		result = "before";
+	        	}
+	        	
+	        	if(date1.equals(date2)){
+	        		result = "equal";
+	        	}
+			} catch (ParseException e) {
+				// TODO Auto-generated catch block
+				result = "ERROR_CONVERTING_TO_DATE";
+			}
+		}else if (ISEMPTY.equals(function)) {
+			
+			Object o = arguments.next();
+			//System.out.println("Object: " + o.toString());
+			if(o == null || o.toString().equals(""))
+				result = true;
+			else
+				result = false;
+		}else {
 			result = (Double) super.evaluate(function, arguments, evaluationContext);
 		}
 		errIfNaN(result, function);
 		return result;
 	}
 	
-	private void errIfNaN(Double result, Function function) {
+	private void errIfNaN(Object result, Function function) {
 		if (result.equals(Double.NaN)) {
 			throw new IllegalArgumentException("Invalid argument passed to "+function.getName());
 		}
